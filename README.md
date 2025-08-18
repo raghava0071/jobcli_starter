@@ -1,3 +1,5 @@
+![CI](https://github.com/raghava0071/jobcli_starter/actions/workflows/ci.yml/badge.svg)
+
 # jobcli — Job Application Tracker (CLI)
 
 A simple, **beginner-friendly** Python command‑line tool to track your job applications using SQLite.
@@ -42,6 +44,28 @@ python -m jobcli.cli stats
 # 9) Export to CSV
 python -m jobcli.cli export --out applications.csv
 ```
+## CLI usage
+
+```bash
+jobcli init
+jobcli add --company "Acme" --role "Data Analyst" --source "LinkedIn"
+jobcli list
+jobcli search --q "Analyst" --limit 5
+jobcli update --id 1 --status interview --notes "Phone screen booked"
+jobcli stats
+jobcli export --out applications.csv
+
+
+## CLI usage
+```bash
+jobcli init
+jobcli add --company "Acme" --role "Data Analyst" --source "LinkedIn"
+jobcli list
+jobcli search --q "Analyst" --limit 5
+jobcli update --id 1 --status interview --notes "Phone screen booked"
+jobcli stats
+jobcli export --out applications.csv
+
 
 ## Commands
 - `init` — create the database if it doesn't exist
