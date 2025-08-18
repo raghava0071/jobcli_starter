@@ -3,6 +3,7 @@
 The database file defaults to ~/.jobcli/jobcli.db, but can be overridden
 by setting the environment variable JOBCLI_DB_PATH (absolute path).
 """
+
 from __future__ import annotations
 
 import os
@@ -10,7 +11,6 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterable, List, Optional
 
 DEFAULT_DB_PATH = Path.home() / ".jobcli" / "jobcli.db"
 DB_PATH = Path(os.getenv("JOBCLI_DB_PATH", str(DEFAULT_DB_PATH)))
@@ -21,11 +21,11 @@ class Application:
     id: int
     company: str
     role: str
-    source: Optional[str]
+    source: str | None
     status: str
     applied_date: str
     last_update: str
-    notes: Optional[str]
+    notes: str | None
 
 
 def _connect() -> sqlite3.Connection:
@@ -56,10 +56,10 @@ def init_db() -> None:
 def add_application(
     company: str,
     role: str,
-    source: Optional[str] = None,
+    source: str | None = None,
     status: str = "applied",
-    applied_date: Optional[str] = None,
-    notes: Optional[str] = None,
+    applied_date: str | None = None,
+    notes: str | None = None,
 ) -> int:
     """Insert a new application and return the new row id."""
     applied = applied_date or date.today().isoformat()
@@ -75,7 +75,7 @@ def add_application(
         return int(cur.lastrowid)
 
 
-def list_applications(status: Optional[str] = None, limit: Optional[int] = None) -> List[Application]:
+def list_applications(status: str | None = None, limit: int | None = None) -> list[Application]:
     """Fetch applications, optionally filtered by status and limited in count."""
     query = "SELECT * FROM applications"
     params: list = []
@@ -90,7 +90,7 @@ def list_applications(status: Optional[str] = None, limit: Optional[int] = None)
     return [Application(**dict(r)) for r in rows]
 
 
-def update_status(app_id: int, status: str, notes: Optional[str] = None) -> None:
+def update_status(app_id: int, status: str, notes: str | None = None) -> None:
     """Update status (and optionally notes) for a record by id."""
     now = datetime.now().isoformat(timespec="seconds")
     with _connect() as conn:
@@ -113,7 +113,16 @@ def export_csv(out_path: Path) -> int:
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM applications ORDER BY id ASC").fetchall()
 
-    fieldnames = ["id", "company", "role", "source", "status", "applied_date", "last_update", "notes"]
+    fieldnames = [
+        "id",
+        "company",
+        "role",
+        "source",
+        "status",
+        "applied_date",
+        "last_update",
+        "notes",
+    ]
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -129,7 +138,9 @@ def stats() -> dict:
     with _connect() as conn:
         total = conn.execute("SELECT COUNT(*) FROM applications").fetchone()[0]
         by_status = dict(
-            conn.execute("SELECT status, COUNT(*) as c FROM applications GROUP BY status").fetchall()
+            conn.execute(
+                "SELECT status, COUNT(*) as c FROM applications GROUP BY status"
+            ).fetchall()
         )
 
         seven_days_ago = (date.today() - timedelta(days=7)).isoformat()
