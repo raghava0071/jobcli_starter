@@ -32,6 +32,23 @@ class Application:
     notes: str | None
 
 
+def search_applications(query: str, limit: int | None = None) -> list[Application]:
+    """Return rows where query matches company, role, source, or notes."""
+    like = f"%{query}%"
+    sql = """
+        SELECT * FROM applications
+        WHERE company LIKE ?
+           OR role LIKE ?
+           OR IFNULL(source, '') LIKE ?
+           OR IFNULL(notes, '') LIKE ?
+        ORDER BY id DESC
+    """
+    with _connect() as conn:
+        rows = conn.execute(sql, (like, like, like, like)).fetchall()
+    apps = [Application(**dict(r)) for r in rows]
+    return apps[:limit] if limit else apps
+
+
 def _connect() -> sqlite3.Connection:
     path = get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
