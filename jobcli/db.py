@@ -13,7 +13,11 @@ from datetime import date, datetime
 from pathlib import Path
 
 DEFAULT_DB_PATH = Path.home() / ".jobcli" / "jobcli.db"
-DB_PATH = Path(os.getenv("JOBCLI_DB_PATH", str(DEFAULT_DB_PATH)))
+
+
+def get_db_path() -> Path:
+    """Return DB path, honoring JOBCLI_DB_PATH if set."""
+    return Path(os.getenv("JOBCLI_DB_PATH", str(DEFAULT_DB_PATH)))
 
 
 @dataclass
@@ -29,8 +33,9 @@ class Application:
 
 
 def _connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    path = get_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
 
