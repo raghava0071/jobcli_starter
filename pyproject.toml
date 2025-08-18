@@ -24,3 +24,6 @@ convention = "google"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[project.scripts]
+jobcli = "jobcli.cli:main"
