@@ -40,6 +40,11 @@ def cmd_init(args):
     print("Database initialized.")
 
 
+def cmd_search(args):
+    rows = db.search_applications(query=args.q, limit=args.limit)
+    _print_table(rows)
+
+
 def cmd_add(args):
     app_id = db.add_application(
         company=args.company,
@@ -106,6 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--status", default=None)
     s.add_argument("--limit", type=int, default=None)
     s.set_defaults(func=cmd_list)
+
+    s = sub.add_parser("search", help="Search applications by text")
+    s.add_argument("--q", required=True, help="Search text (matches company, role, source, notes)")
+    s.add_argument("--limit", type=int, default=None)
+    s.set_defaults(func=cmd_search)
 
     s = sub.add_parser("update", help="Update status/notes for a record")
     s.add_argument("--id", type=int, required=True, help="Application ID")
