@@ -65,6 +65,7 @@ jobcli search --q "Analyst" --limit 5
 jobcli update --id 1 --status interview --notes "Phone screen booked"
 jobcli stats
 jobcli export --out applications.csv
+jobcli delete --id 3
 
 
 ## Commands
