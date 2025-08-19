@@ -45,6 +45,11 @@ def cmd_search(args):
     _print_table(rows)
 
 
+def cmd_delete(args):
+    ok = db.delete_application(args.id)
+    print("Deleted." if ok else f"No application with id={args.id}.")
+
+
 def cmd_add(args):
     app_id = db.add_application(
         company=args.company,
@@ -55,11 +60,6 @@ def cmd_add(args):
         notes=args.notes,
     )
     print(f"Added application with id={app_id}.")
-
-
-def cmd_delete(args):
-    ok = db.delete_application(args.id)
-    print("Deleted." if ok else f"No application with id={args.id}.")
 
 
 def cmd_list(args):
@@ -94,51 +94,52 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
-    s = sub.add_parser("init", help="Initialize the database")
-    s.set_defaults(func=cmd_init)
+    p_init = sub.add_parser("init", help="Initialize the database")
+    p_init.set_defaults(func=cmd_init)
 
-    s = sub.add_parser("add", help="Add a new application")
-    s.add_argument("--company", required=True)
-    s.add_argument("--role", required=True)
-    s.add_argument(
+    p_add = sub.add_parser("add", help="Add a new application")
+    p_add.add_argument("--company", required=True)
+    p_add.add_argument("--role", required=True)
+    p_add.add_argument(
         "--source", default=None, help="Where you found the job (LinkedIn, Indeed, referral...)"
     )
-    s.add_argument(
+    p_add.add_argument(
         "--status", default="applied", help="applied|interview|offer|rejected|ghosted|withdrawn"
     )
-
-    s = sub.add_parser("delete", help="Delete an application by ID")
-    s.add_argument("--id", type=int, required=True)
-    s.set_defaults(func=cmd_delete)
-
-    s.add_argument(
+    p_add.add_argument(
         "--applied-date", dest="applied_date", default=None, help="YYYY-MM-DD (defaults to today)"
     )
-    s.add_argument("--notes", default=None)
-    s.set_defaults(func=cmd_add)
+    p_add.add_argument("--notes", default=None)
+    p_add.set_defaults(func=cmd_add)
 
-    s = sub.add_parser("list", help="List applications")
-    s.add_argument("--status", default=None)
-    s.add_argument("--limit", type=int, default=None)
-    s.set_defaults(func=cmd_list)
+    p_list = sub.add_parser("list", help="List applications")
+    p_list.add_argument("--status", default=None)
+    p_list.add_argument("--limit", type=int, default=None)
+    p_list.set_defaults(func=cmd_list)
 
-    s = sub.add_parser("search", help="Search applications by text")
-    s.add_argument("--q", required=True, help="Search text (matches company, role, source, notes)")
-    s.add_argument("--limit", type=int, default=None)
-    s.set_defaults(func=cmd_search)
+    p_search = sub.add_parser("search", help="Search applications by text")
+    p_search.add_argument(
+        "--q", required=True, help="Search text (matches company, role, source, notes)"
+    )
+    p_search.add_argument("--limit", type=int, default=None)
+    p_search.set_defaults(func=cmd_search)
 
-    s = sub.add_parser("update", help="Update status/notes for a record")
-    s.add_argument("--id", type=int, required=True, help="Application ID")
-    s.add_argument("--status", required=True)
-    s.add_argument("--notes", default=None)
-    s.set_defaults(func=cmd_update)
+    p_update = sub.add_parser("update", help="Update status/notes for a record")
+    p_update.add_argument("--id", type=int, required=True, help="Application ID")
+    p_update.add_argument("--status", required=True)
+    p_update.add_argument("--notes", default=None)
+    p_update.set_defaults(func=cmd_update)
 
-    s = sub.add_parser("stats", help="Show simple stats")
-    s.set_defaults(func=cmd_stats)
+    p_stats = sub.add_parser("stats", help="Show simple stats")
+    p_stats.set_defaults(func=cmd_stats)
 
-    s = sub.add_parser("export", help="Export all records to CSV")
-    s.add_argument("--out", required=True, help="Output CSV path")
-    s.set_defaults(func=cmd_export)
+    p_export = sub.add_parser("export", help="Export all records to CSV")
+    p_export.add_argument("--out", required=True, help="Output CSV path")
+    p_export.set_defaults(func=cmd_export)
+
+    p_delete = sub.add_parser("delete", help="Delete an application by ID")
+    p_delete.add_argument("--id", type=int, required=True)
+    p_delete.set_defaults(func=cmd_delete)
 
     return p
 
