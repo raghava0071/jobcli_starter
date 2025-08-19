@@ -27,3 +27,18 @@ def test_happy_flow(tmp_path, monkeypatch):
     n = db.export_csv(out_csv)
     assert n == 1
     assert out_csv.exists()
+
+
+def test_delete(tmp_path, monkeypatch):
+    test_db = tmp_path / "test.db"
+    monkeypatch.setenv("JOBCLI_DB_PATH", str(test_db))
+
+    db.init_db()
+    app_id = db.add_application(company="DeleteMe", role="Analyst")
+    assert app_id >= 1
+
+    ok = db.delete_application(app_id)
+    assert ok is True
+
+    rows = db.list_applications()
+    assert len(rows) == 0

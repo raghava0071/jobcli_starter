@@ -112,6 +112,13 @@ def list_applications(status: str | None = None, limit: int | None = None) -> li
     return [Application(**dict(r)) for r in rows]
 
 
+def delete_application(app_id: int) -> bool:
+    """Delete an application by id. Returns True if a row was removed."""
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM applications WHERE id = ?", (app_id,))
+        return cur.rowcount > 0
+
+
 def update_status(app_id: int, status: str, notes: str | None = None) -> None:
     """Update status (and optionally notes) for a record by id."""
     now = datetime.now().isoformat(timespec="seconds")

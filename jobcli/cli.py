@@ -57,6 +57,11 @@ def cmd_add(args):
     print(f"Added application with id={app_id}.")
 
 
+def cmd_delete(args):
+    ok = db.delete_application(args.id)
+    print("Deleted." if ok else f"No application with id={args.id}.")
+
+
 def cmd_list(args):
     rows = db.list_applications(status=args.status, limit=args.limit)
     _print_table(rows)
@@ -101,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument(
         "--status", default="applied", help="applied|interview|offer|rejected|ghosted|withdrawn"
     )
+
+    s = sub.add_parser("delete", help="Delete an application by ID")
+    s.add_argument("--id", type=int, required=True)
+    s.set_defaults(func=cmd_delete)
+
     s.add_argument(
         "--applied-date", dest="applied_date", default=None, help="YYYY-MM-DD (defaults to today)"
     )
