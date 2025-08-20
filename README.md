@@ -1,6 +1,8 @@
 ![CI](https://github.com/raghava0071/jobcli_starter/actions/workflows/ci.yml/badge.svg)
 
 # jobcli — Job Application Tracker (CLI)
+jobcli list --since 2025-08-01
+jobcli summary --days 7
 
 A simple, **beginner-friendly** Python command‑line tool to track your job applications using SQLite.
 It includes tests, linting, pre-commit hooks, and GitHub Actions CI — perfect for your GitHub portfolio.
