@@ -132,6 +132,11 @@ def update_application(app_id: int, status: str, notes: str | None = None) -> bo
         return cur.rowcount > 0
 
 
+def update_status(app_id: int, status: str, notes: str | None = None) -> bool:
+    """Backward-compat wrapper for tests; delegates to update_application."""
+    return update_application(app_id, status, notes)
+
+
 def get_stats() -> dict:
     """Return total and counts by status."""
     with _connect() as conn:
@@ -140,6 +145,11 @@ def get_stats() -> dict:
             "SELECT status, COUNT(*) as c FROM applications GROUP BY status"
         ).fetchall()
     return {"total": total, "by_status": {r["status"]: r["c"] for r in by_status_rows}}
+
+
+def stats() -> dict:
+    """Compatibility wrapper for tests; returns overall stats."""
+    return get_stats()
 
 
 def export_csv(out_path: str | Path) -> int:
