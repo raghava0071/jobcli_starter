@@ -6,10 +6,11 @@ by setting the environment variable JOBCLI_DB_PATH (absolute path).
 
 from __future__ import annotations
 
+import csv
 import os
 import sqlite3
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 DEFAULT_DB_PATH = Path.home() / ".jobcli" / "jobcli.db"
@@ -18,6 +19,15 @@ DEFAULT_DB_PATH = Path.home() / ".jobcli" / "jobcli.db"
 def get_db_path() -> Path:
     """Return DB path, honoring JOBCLI_DB_PATH if set."""
     return Path(os.getenv("JOBCLI_DB_PATH", str(DEFAULT_DB_PATH)))
+
+
+def _connect() -> sqlite3.Connection:
+    """Create a SQLite connection and ensure parent directory exists."""
+    path = get_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 @dataclass
@@ -32,32 +42,8 @@ class Application:
     notes: str | None
 
 
-def search_applications(query: str, limit: int | None = None) -> list[Application]:
-    """Return rows where query matches company, role, source, or notes."""
-    like = f"%{query}%"
-    sql = """
-        SELECT * FROM applications
-        WHERE company LIKE ?
-           OR role LIKE ?
-           OR IFNULL(source, '') LIKE ?
-           OR IFNULL(notes, '') LIKE ?
-        ORDER BY id DESC
-    """
-    with _connect() as conn:
-        rows = conn.execute(sql, (like, like, like, like)).fetchall()
-    apps = [Application(**dict(r)) for r in rows]
-    return apps[:limit] if limit else apps
-
-
-def _connect() -> sqlite3.Connection:
-    path = get_db_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def init_db() -> None:
+    """Create the database schema if it does not already exist."""
     with _connect() as conn:
         conn.execute(
             """
@@ -83,13 +69,16 @@ def add_application(
     applied_date: str | None = None,
     notes: str | None = None,
 ) -> int:
-    """Insert a new application and return the new row id."""
+    """Insert a new application and return its ID."""
     applied = applied_date or date.today().isoformat()
     now = datetime.now().isoformat(timespec="seconds")
     with _connect() as conn:
         cur = conn.execute(
             """
-            INSERT INTO applications (company, role, source, status, applied_date, last_update, notes)
+            INSERT INTO applications (
+                company, role, source, status,
+                applied_date, last_update, notes
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (company, role, source, status, applied, now, notes),
@@ -97,19 +86,112 @@ def add_application(
         return int(cur.lastrowid)
 
 
-def list_applications(status: str | None = None, limit: int | None = None) -> list[Application]:
-    """Fetch applications, optionally filtered by status and limited in count."""
+def list_applications(
+    status: str | None = None,
+    limit: int | None = None,
+    since: str | None = None,
+) -> list[Application]:
+    """Fetch applications; optional filters: status, since (YYYY-MM-DD), and limit."""
     query = "SELECT * FROM applications"
-    params: list = []
+    clauses: list[str] = []
+    params: list[object] = []
+
     if status:
-        query += " WHERE status = ?"
+        clauses.append("status = ?")
         params.append(status)
+    if since:
+        clauses.append("applied_date >= ?")
+        params.append(since)
+
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+
     query += " ORDER BY id DESC"
     if limit:
         query += f" LIMIT {int(limit)}"
+
     with _connect() as conn:
         rows = conn.execute(query, params).fetchall()
     return [Application(**dict(r)) for r in rows]
+
+
+def update_application(app_id: int, status: str, notes: str | None = None) -> bool:
+    """Update status (and notes if provided). Returns True if a row was updated."""
+    now = datetime.now().isoformat(timespec="seconds")
+    with _connect() as conn:
+        if notes is None:
+            cur = conn.execute(
+                "UPDATE applications SET status = ?, last_update = ? WHERE id = ?",
+                (status, now, app_id),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE applications SET status = ?, notes = ?, last_update = ? WHERE id = ?",
+                (status, notes, now, app_id),
+            )
+        return cur.rowcount > 0
+
+
+def update_status(app_id: int, status: str, notes: str | None = None) -> bool:
+    """Backward-compat wrapper for tests; delegates to update_application."""
+    return update_application(app_id, status, notes)
+
+
+def get_stats() -> dict:
+    """Return total and counts by status."""
+    with _connect() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM applications").fetchone()[0]
+        by_status_rows = conn.execute(
+            "SELECT status, COUNT(*) as c FROM applications GROUP BY status"
+        ).fetchall()
+    return {"total": total, "by_status": {r["status"]: r["c"] for r in by_status_rows}}
+
+
+def stats() -> dict:
+    """Compatibility wrapper for tests; returns overall stats."""
+    return get_stats()
+
+
+def export_csv(out_path: str | Path) -> int:
+    """Export all records to CSV. Returns the number of rows written."""
+    out = Path(out_path)
+    with _connect() as conn, out.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            ["id", "company", "role", "source", "status", "applied_date", "last_update", "notes"]
+        )
+        rows = conn.execute("SELECT * FROM applications ORDER BY id").fetchall()
+        for r in rows:
+            writer.writerow(
+                [
+                    r["id"],
+                    r["company"],
+                    r["role"],
+                    r["source"],
+                    r["status"],
+                    r["applied_date"],
+                    r["last_update"],
+                    r["notes"],
+                ]
+            )
+    return len(rows)
+
+
+def search_applications(query: str, limit: int | None = None) -> list[Application]:
+    """Return rows where query matches company, role, source, or notes."""
+    like = f"%{query}%"
+    sql = """
+        SELECT * FROM applications
+        WHERE company LIKE ?
+           OR role LIKE ?
+           OR IFNULL(source, '') LIKE ?
+           OR IFNULL(notes, '') LIKE ?
+        ORDER BY id DESC
+    """
+    with _connect() as conn:
+        rows = conn.execute(sql, (like, like, like, like)).fetchall()
+    apps = [Application(**dict(r)) for r in rows]
+    return apps[:limit] if limit else apps
 
 
 def delete_application(app_id: int) -> bool:
@@ -119,64 +201,17 @@ def delete_application(app_id: int) -> bool:
         return cur.rowcount > 0
 
 
-def update_status(app_id: int, status: str, notes: str | None = None) -> None:
-    """Update status (and optionally notes) for a record by id."""
-    now = datetime.now().isoformat(timespec="seconds")
+def summary_last_n_days(days: int = 7) -> dict:
+    """Return counts for applications applied in the last N days (default 7)."""
+    since_date = (date.today() - timedelta(days=days)).isoformat()
     with _connect() as conn:
-        if notes is None:
-            conn.execute(
-                "UPDATE applications SET status = ?, last_update = ? WHERE id = ?",
-                (status, now, app_id),
-            )
-        else:
-            conn.execute(
-                "UPDATE applications SET status = ?, last_update = ?, notes = ? WHERE id = ?",
-                (status, now, notes, app_id),
-            )
-
-
-def export_csv(out_path: Path) -> int:
-    """Export all applications to a CSV file and return the number of rows written."""
-    import csv
-
-    with _connect() as conn:
-        rows = conn.execute("SELECT * FROM applications ORDER BY id ASC").fetchall()
-
-    fieldnames = [
-        "id",
-        "company",
-        "role",
-        "source",
-        "status",
-        "applied_date",
-        "last_update",
-        "notes",
-    ]
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in rows:
-            writer.writerow(dict(r))
-    return len(rows)
-
-
-def stats() -> dict:
-    """Return basic stats: total, by status, applied_last_7_days."""
-    from datetime import timedelta
-
-    with _connect() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM applications").fetchone()[0]
-        by_status = dict(
-            conn.execute(
-                "SELECT status, COUNT(*) as c FROM applications GROUP BY status"
-            ).fetchall()
-        )
-
-        seven_days_ago = (date.today() - timedelta(days=7)).isoformat()
-        last_7 = conn.execute(
-            "SELECT COUNT(*) FROM applications WHERE applied_date >= ?", (seven_days_ago,)
+        total = conn.execute(
+            "SELECT COUNT(*) FROM applications WHERE applied_date >= ?", (since_date,)
         ).fetchone()[0]
+        by_status_rows = conn.execute(
+            "SELECT status, COUNT(*) as c FROM applications WHERE applied_date >= ? GROUP BY status",
+            (since_date,),
+        ).fetchall()
 
-    # sqlite Row -> dict for by_status values
-    by_status = {k: (v if isinstance(v, int) else v["c"]) for k, v in by_status.items()}
-    return {"total": total, "by_status": by_status, "applied_last_7_days": last_7}
+    by_status = {r["status"]: r["c"] for r in by_status_rows}
+    return {"since": since_date, "days": days, "total": total, "by_status": by_status}

@@ -62,8 +62,17 @@ def cmd_add(args):
     print(f"Added application with id={app_id}.")
 
 
+def cmd_summary(args):
+    s = db.summary_last_n_days(days=args.days)
+    print(f"Summary since {s['since']} ({s['days']} days)")
+    print(f"Total: {s['total']}")
+    print("By status:")
+    for k, v in sorted(s["by_status"].items()):
+        print(f"  {k}: {v}")
+
+
 def cmd_list(args):
-    rows = db.list_applications(status=args.status, limit=args.limit)
+    rows = db.list_applications(status=args.status, limit=args.limit, since=args.since)
     _print_table(rows)
 
 
@@ -97,6 +106,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = sub.add_parser("init", help="Initialize the database")
     p_init.set_defaults(func=cmd_init)
 
+    p_summary = sub.add_parser("summary", help="Show counts for the last N days (default 7)")
+    p_summary.add_argument("--days", type=int, default=7)
+    p_summary.set_defaults(func=cmd_summary)
+
     p_add = sub.add_parser("add", help="Add a new application")
     p_add.add_argument("--company", required=True)
     p_add.add_argument("--role", required=True)
@@ -115,6 +128,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_list = sub.add_parser("list", help="List applications")
     p_list.add_argument("--status", default=None)
     p_list.add_argument("--limit", type=int, default=None)
+    p_list.add_argument(
+        "--since", default=None, help="YYYY-MM-DD; only show apps on/after this date"
+    )
     p_list.set_defaults(func=cmd_list)
 
     p_search = sub.add_parser("search", help="Search applications by text")
